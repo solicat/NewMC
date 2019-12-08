@@ -8,7 +8,7 @@
 
 struct item{
 	int check;
-	char name[BUFSIZ];
+	char name[BUFSIZ - 10];
 }item;
 
 char pwd[BUFSIZ - 10];
@@ -17,6 +17,7 @@ int count;
 int cur_row;
 struct item data[BUFSIZ];
 
+char get_key();
 void print_pwd();
 void load_ls();
 void print_ls();
@@ -26,8 +27,8 @@ int main(int argc, char* argv[])
 	initscr();
 	clear();
 
-	int c;
 	FILE* fp;
+	int temp;
 	
 	fp = popen("pwd", "r");
 	fgets(pwd, BUFSIZ, fp);
@@ -35,11 +36,43 @@ int main(int argc, char* argv[])
 
 	print_pwd();
 	load_ls();
-	print_ls();	
+	print_ls();
 
-	getch();
-	
+	while(1)
+	{
+		temp = get_key();
+		if(temp == '\33')
+		{
+			get_key();
+			temp = get_key();
+			if(temp == 'A')		// Up Arrow
+			{
+				if(cur_row > 0)
+					move(--cur_row + LS, 0);
+				refresh();
+			}
+			else if(temp == 'B')	// Down Arrow
+			{
+				if(cur_row < count - 1)
+					move(++cur_row + LS, 0);
+				refresh();
+			}
+		}
+	}	
 	endwin();
+}
+
+char get_key()
+{
+	struct termios oldt, newt;
+	char ch;
+	tcgetattr(0, &oldt);
+	newt = oldt;
+	newt.c_lflag &= ~(ICANON|ECHO);
+	tcsetattr(0, TCSANOW, &newt);
+	ch = getchar();
+	tcsetattr(0, TCSANOW, &oldt);
+	return ch;
 }
 
 void print_pwd()
@@ -76,12 +109,15 @@ void load_ls()
 
 void print_ls()
 {
+	char temp[BUFSIZ];
 	for(int i = 0; i < count; i++)
 	{
 		move(LS + i, 5);
-		addstr(data[i].check);
-		addstr(data[i].name);
+		sprintf(temp, "%d %s", data[i].check, data[i].name);
+		addstr(temp);
+		bzero(temp, BUFSIZ);
 	}
 	move(LS, 0);
 	refresh();
+	cur_row = 0;
 }
