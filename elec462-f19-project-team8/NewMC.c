@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <termios.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <dirent.h>
+#include <sys/stat.h>
 #include <curses.h>
 
 #define PWD 2
@@ -8,7 +12,7 @@
 
 struct item{
 	int check;
-	char name[BUFSIZ - 10];
+	char name[BUFSIZ];
 }item;
 
 char pwd[BUFSIZ - 10];
@@ -17,62 +21,47 @@ int count;
 int cur_row;
 struct item data[BUFSIZ];
 
-char get_key();
 void print_pwd();
 void load_ls();
 void print_ls();
+void cd();
 
 int main(int argc, char* argv[])
 {
 	initscr();
+
+    	crmode();
+	keypad(stdscr, TRUE);
+   	noecho();
+
 	clear();
 
-	FILE* fp;
-	int temp;
+	int c; cur_row = 0;
+	FILE* fp; struct stat sbuf;
 	
 	fp = popen("pwd", "r");
 	fgets(pwd, BUFSIZ, fp);
-	pclose(fp);
 
-	print_pwd();
+
 	load_ls();
-	print_ls();
-
+	
 	while(1)
-	{
-		temp = get_key();
-		if(temp == '\33')
-		{
-			get_key();
-			temp = get_key();
-			if(temp == 'A')		// Up Arrow
-			{
-				if(cur_row > 0)
-					move(--cur_row + LS, 0);
-				refresh();
-			}
-			else if(temp == 'B')	// Down Arrow
-			{
-				if(cur_row < count - 1)
-					move(++cur_row + LS, 0);
-				refresh();
-			}
-		}
-	}	
-	endwin();
-}
+	{	
+		clear();
+		print_pwd();
+		print_ls();
 
-char get_key()
-{
-	struct termios oldt, newt;
-	char ch;
-	tcgetattr(0, &oldt);
-	newt = oldt;
-	newt.c_lflag &= ~(ICANON|ECHO);
-	tcsetattr(0, TCSANOW, &newt);
-	ch = getchar();
-	tcsetattr(0, TCSANOW, &oldt);
-	return ch;
+		switch(c = getch())
+		{
+			case KEY_DOWN: if(cur_row+1<count)cur_row++; break;
+			case KEY_UP: if(cur_row>0)cur_row--; break;
+			case '\n': data[cur_row].check *= -1;
+			default: break;
+		}
+	}
+
+	pclose(fp);
+	endwin();
 }
 
 void print_pwd()
@@ -99,7 +88,7 @@ void load_ls()
 	fgets(buf, BUFSIZ, fp);	// ./
 	while(fgets(buf, BUFSIZ, fp))
 	{
-		data[count].check = 0;
+		data[count].check = 1;
 		strcpy(data[count].name, buf);
 		count++;
 	}
@@ -109,15 +98,19 @@ void load_ls()
 
 void print_ls()
 {
-	char temp[BUFSIZ];
+	printw("%d Files in this directory", count);
 	for(int i = 0; i < count; i++)
 	{
 		move(LS + i, 5);
-		sprintf(temp, "%d %s", data[i].check, data[i].name);
-		addstr(temp);
-		bzero(temp, BUFSIZ);
+		if(i == cur_row)
+		{
+			move(LS + i, 2);
+			printw(">> ");
+		}
+		if(data[i].check == 1)	printw("( ) | ");
+		else printw("(V) | ");
+		printw("%s", data[i].name);
 	}
 	move(LS, 0);
 	refresh();
-	cur_row = 0;
 }
