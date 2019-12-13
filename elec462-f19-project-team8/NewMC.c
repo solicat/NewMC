@@ -14,6 +14,8 @@
 #define PWD 2
 #define LS 4
 
+#define SELECT 1
+
 struct item{
 	int check;
 	char name[BUFSIZ];
@@ -28,6 +30,7 @@ struct item data[BUFSIZ];
 void print_pwd();
 void load_ls();
 void print_ls();
+void print_menu();
 void cd();
 char* ch_fname(char*);
 int isadir(char*);
@@ -42,45 +45,52 @@ int main(int argc, char* argv[])
 {
 	initscr();
 
-    	crmode();
+	crmode();
 	keypad(stdscr, TRUE);
-   	noecho();
-
+	noecho();
+	
 	clear();
+
+	start_color();
+	
+	init_color(COLOR_BLACK, 200, 200, 500);
+	init_color(COLOR_YELLOW, 1000, 1000, 0);
+	init_pair(SELECT, COLOR_YELLOW, COLOR_BLACK);
 
 	int c; cur_row = 0;
 	FILE* fp; struct stat sbuf;
-	
+
 	fp = popen("pwd", "r");
 	fgets(pwd, BUFSIZ, fp);
 	load_ls();
-	
+
 	while(1)
 	{	
 		clear();
 		print_pwd();
 		print_ls();
+		print_menu();
 
 		switch(c = getch())
 		{
 			case KEY_DOWN: if(cur_row+1<count)cur_row++; break;
 			case KEY_UP: if(cur_row>0)cur_row--; break;
 			case '\n': 
-				if(isadir(ch_fname(data[cur_row].name))){
-					//if directory. chdir.
-					chdir(ch_fname(data[cur_row].name));
-					getcwd(pwd, BUFSIZ-10);
-					load_ls();
-				}
-				else
-					data[cur_row].check *= -1;
-				break;
-			case KEY_F(5):_cp(); load_ls(); break;//file copy
-			case KEY_F(6):_mv(); load_ls(); break;//file mv
-			case KEY_F(7):_mkdir(); load_ls(); break;//mkdir
-			case KEY_F(8):_rm(); load_ls(); break;//file delete
+					     if(isadir(ch_fname(data[cur_row].name))){
+						     //if directory. chdir.
+						     chdir(ch_fname(data[cur_row].name));
+						     getcwd(pwd, BUFSIZ-10);
+						     load_ls();
+						     cur_row = 0;
+					     }
+					     break;
+			case KEY_F(5):_cp(); load_ls(); print_ls(); break;//file copy
+			case KEY_F(6):_mv(); load_ls(); print_ls(); break;//file mv
+			case KEY_F(7):_mkdir(); load_ls(); print_ls(); break;//mkdir
+			case KEY_F(8):_rm(); load_ls(); print_ls(); break;//file delete
 			case KEY_HOME: cur_row = 0; break;
-			case KEY_END:  cur_row = count-1; break;
+			case KEY_END:  cur_row = count - 1; break;
+			case KEY_IC: if(cur_row != 0)data[cur_row].check *= -1; if(cur_row+1<count)cur_row++; break;
 			default: break;
 		}
 	}
@@ -122,7 +132,8 @@ void load_ls()
 
 void print_ls()
 {
-	printw("%d Files in this directory", count);
+	move(LINES-2, 0);
+	printw("%d Files in this directory", count - 1);
 	for(int i = 0; i < count; i++)
 	{
 		move(LS + i, 5);
@@ -131,16 +142,24 @@ void print_ls()
 			move(LS + i, 2);
 			printw(">> ");
 		}
-		if(isadir(ch_fname(data[i].name))) printw("    | ");
-		else{
-			if(data[i].check == 1) printw("( ) | ");
-			else printw("(V) | ");
-		}
+		if(data[i].check == -1)
+			attron(COLOR_PAIR(SELECT));
 		printw("%s", data[i].name);
+		if(data[i].check == -1)
+			attroff(COLOR_PAIR(SELECT));
 	}
 	move(LINES-1, COLS-1);//just in case
 	curs_set(0);
 	refresh();
+}
+
+void print_menu()
+{
+	char* menu[10] = {"Help", "Menu", "View", "Edit", "Copy", "RenMov", "Mkdir", "Delete", "PullDn", "Quit"};
+	move(LINES-1, 0);
+	for(int i = 0; i < 10; i++)
+		printw("%-2d%-8s", i + 1, menu[i]);
+	move(LINES-1, COLS-1);
 }
 
 char* ch_fname(char* f){
@@ -150,7 +169,7 @@ char* ch_fname(char* f){
 	name = strrchr(f, ' ')+1;
 	strcat(fname, name);
 	fname[strlen(fname)-1]='\0';//remove \r\n
-	
+
 	filename = (char*)malloc(sizeof(fname));
 	strcpy(filename, fname);
 
@@ -201,8 +220,8 @@ void _cp(){
 	for(int i=0; i<num; i++){
 		if((pid=fork())==-1) return;
 		if(pid ==0){
-		execlp("cp", "cp", sourcefile[i], targetfile[i], NULL);
-		exit(1);
+			execlp("cp", "cp", sourcefile[i], targetfile[i], NULL);
+			exit(1);
 		}
 	}
 }
@@ -212,7 +231,7 @@ void _mv(){
 	int pid, num=0;
 	int mv_stat = 0;//0 : mv file1 file2     1: mv file1 dir1
 	signal(SIGCHLD, child_waiter);
-	
+
 	input_set(1);
 	printw("selecet mode : 1. rename  2. move directory >> ");
 	do{
@@ -221,7 +240,7 @@ void _mv(){
 			printw("please input 1 or 2");
 		else break;
 	}while(1);
-	
+
 	if(mv_stat == 1){//rename files selected
 		char sourcefile[MAX][BUFSIZ], targetfile[MAX][BUFSIZ];
 		//input targetfile names
@@ -229,7 +248,7 @@ void _mv(){
 			if(data[i].check == -1){
 				strcpy(sourcefile[num], ch_fname(data[i].name));
 				input_set(1);
-				printw("input filename : mv %s ", 						sourcefile[num]);
+				printw("input filename : mv %s ", sourcefile[num]);
 				scanw("%s", buf);
 				strcpy(targetfile[num++], buf);
 			}
@@ -240,8 +259,8 @@ void _mv(){
 		for(int i=0; i<num; i++){
 			if((pid=fork())==-1) return;
 			if(pid ==0){
-			execlp("mv", "mv", sourcefile[i], targetfile[i], NULL);
-			exit(1);
+				execlp("mv", "mv", sourcefile[i], targetfile[i], NULL);
+				exit(1);
 			}
 		}
 	}
@@ -249,7 +268,7 @@ void _mv(){
 		char *arglist[MAX];
 
 		input_set(1);
-       		addstr("input dirname: ");
+		addstr("input dirname: ");
 		scanw("%s", buf);
 
 		arglist[num++] = "mv";
@@ -273,9 +292,9 @@ void _mkdir(){
 	char *arglist[MAX], buf[BUFSIZ];
 	int pid, len=1;
 	signal(SIGCHLD, child_waiter);
-	
+
 	input_set(1);
-       	addstr("input dirname: ");
+	addstr("input dirname: ");
 
 	arglist[0] = "mkdir";
 	scanw("%s", buf);
