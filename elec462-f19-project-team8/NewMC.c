@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <curses.h>
 
+#define MAX 100 //number of check
 #define PWD 2
 #define LS 4
 
@@ -30,6 +31,7 @@ void print_ls();
 void cd();
 char* ch_fname(char*);
 int isadir(char*);
+void input_set();
 void child_waiter(int);
 void _cp();
 void _mv();
@@ -66,9 +68,9 @@ int main(int argc, char* argv[])
 			case '\n': 
 				if(isadir(ch_fname(data[cur_row].name))){
 					//if directory. chdir.
-					//chdir(ch_fname(data[cur_row].name));
-					//print_pwd();
-					//load_ls();
+					chdir(ch_fname(data[cur_row].name));
+					getcwd(pwd, BUFSIZ-10);
+					load_ls();
 				}
 				else
 					data[cur_row].check *= -1;
@@ -136,7 +138,7 @@ void print_ls()
 		}
 		printw("%s", data[i].name);
 	}
-	move(LINES-1, COLS-1);//just in case...
+	move(LINES-1, COLS-1);//just in case
 	curs_set(0);
 	refresh();
 }
@@ -160,68 +162,126 @@ int isadir(char* f){
 	return (stat(f,&info)!=-1 && S_ISDIR(info.st_mode));
 }
 
+void input_set(int b){//1 is set, 0 is unset
+	if(b){
+		move(count+7, 3);
+		clrtobot();//wipe
+		curs_set(b); 
+		echo(); 
+		refresh();
+	}
+	else{
+		curs_set(b);
+		noecho();
+	}
+}
+
 void child_waiter(int signum){
 	while(waitpid(-1, NULL, WNOHANG)>0);
 }
 
 void _cp(){
-	char *sourcefile, num[10], targetfile[30] = "target";//input...
-	int pid;
+	char sourcefile[MAX][BUFSIZ], targetfile[MAX][BUFSIZ], buf[BUFSIZ];
+	int pid, num=0;
 	signal(SIGCHLD, child_waiter);
-	for(int i=0; i<count; i++){
-		if(data[i].check == -1){//cp source target
-			data[i].check *=-1;
-			sourcefile = ch_fname(data[i].name);
-			sprintf(num, "%d", i);
-			strcat(targetfile, num);
 
-			if((pid=fork())==-1) return;
-			if(pid ==0){
-			execlp("cp", "cp", sourcefile, targetfile, NULL);
-			exit(1);
-			}
+	//input targetfile names
+	for(int i =0; i<count; i++){
+		if(data[i].check == -1){
+			strcpy(sourcefile[num], ch_fname(data[i].name));
+			input_set(1);
+			printw("input filename : cp %s ", sourcefile[num]);
+			scanw("%s", buf);
+			strcpy(targetfile[num++], buf);
+		}
+	}
+	input_set(0);
+
+	//exec cp source target (num is checking num)
+	for(int i=0; i<num; i++){
+		if((pid=fork())==-1) return;
+		if(pid ==0){
+		execlp("cp", "cp", sourcefile[i], targetfile[i], NULL);
+		exit(1);
 		}
 	}
 }
 
 void _mv(){
-/*	char *source, num[10], target[30] = "mv";//input...
-	int pid;
+	char buf[BUFSIZ];
+	int pid, num=0;
+	int mv_stat = 0;//0 : mv file1 file2     1: mv file1 dir1
 	signal(SIGCHLD, child_waiter);
-	for(int i=0; i<count; i++){
-		if(data[i].check == -1){//mv file1 file2 || mv file1 dir1
-			data[i].check *=-1;
-			sourcefile = ch_fname(data[i].name);
-			sprintf(num, "%d", i);
-			strcat(targetfile, num);
+	
+	input_set(1);
+	printw("selecet mode : 1. rename  2. move directory >> ");
+	do{
+		scanw("%d ", &mv_stat);
+		if(mv_stat !=1 && mv_stat != 2)
+			printw("please input 1 or 2");
+		else break;
+	}while(1);
+	
+	if(mv_stat == 1){//rename files selected
+		char sourcefile[MAX][BUFSIZ], targetfile[MAX][BUFSIZ];
+		//input targetfile names
+		for(int i =0; i<count; i++){
+			if(data[i].check == -1){
+				strcpy(sourcefile[num], ch_fname(data[i].name));
+				input_set(1);
+				printw("input filename : mv %s ", 						sourcefile[num]);
+				scanw("%s", buf);
+				strcpy(targetfile[num++], buf);
+			}
+		}
+		input_set(0);	
 
+		//exec cp source target (num is checking num)
+		for(int i=0; i<num; i++){
 			if((pid=fork())==-1) return;
 			if(pid ==0){
-				if(isadir())
-			execlp("mv", "mv", sourcefile, targetfile, NULL);
+			execlp("mv", "mv", sourcefile[i], targetfile[i], NULL);
 			exit(1);
 			}
 		}
 	}
-*/
+	else{//move on another directory
+		char *arglist[MAX];
+
+		input_set(1);
+       		addstr("input dirname: ");
+		scanw("%s", buf);
+
+		arglist[num++] = "mv";
+		for(int i=0; i<count; i++){//mv file1 file2 file3... dir1
+			if(data[i].check == -1)
+				arglist[num++] = ch_fname(data[i].name);
+		}
+		arglist[num++] = buf;
+		arglist[num] = 0;
+		input_set(0);
+
+		if((pid=fork())==-1) return;
+		if(pid ==0){
+			execvp(arglist[0], arglist);
+			exit(1);
+		}
+	}
 }
 
 void _mkdir(){
-	char *arglist[100], buf[BUFSIZ];
+	char *arglist[MAX], buf[BUFSIZ];
 	int pid, len=1;
 	signal(SIGCHLD, child_waiter);
-	move(count+7, 3);
+	
+	input_set(1);
        	addstr("input dirname: ");
-	curs_set(1); 
-	echo(); 
-	refresh();
 
 	arglist[0] = "mkdir";
 	scanw("%s", buf);
 	arglist[len++] = buf;
 	arglist[len] = 0;
-	curs_set(0);
-	noecho();
+	input_set(0);
 
 	if((pid=fork())==-1) return;
 	if(pid ==0){
@@ -231,7 +291,7 @@ void _mkdir(){
 }
 
 void _rm(){
-	char *arglist[100];
+	char *arglist[MAX];
 	arglist[0] = "rm";
 	int pid, len=1;
 	signal(SIGCHLD, child_waiter);
