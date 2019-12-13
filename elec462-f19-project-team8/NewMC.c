@@ -42,6 +42,7 @@ void _cp();
 void _mv();
 void _mkdir();
 void _rm();
+void _search();
 
 int main(int argc, char* argv[])
 {
@@ -118,12 +119,14 @@ int main(int argc, char* argv[])
 					endwin();
 					return 1;	//quit
 
+			case '/' : _search();           //search
+				   break;
+
 			case KEY_HOME:	cur_row = 0; 
 					break;		//cur move top
 
-			case KEY_END:	cur_row = count - 1;
+			case KEY_END:	cur_row = count%15 - 1;
 					break;		//cur move bottom
-
 			case KEY_IC:	if(cur_page*15 + cur_row != 0)
 						data[cur_page*15 + cur_row].check *= -1;
 					if((cur_page < page && cur_row+1<15) || (cur_page == page && cur_page*15 + cur_row +1<count))
@@ -253,17 +256,16 @@ int isadir(char* f)
 
 void input_set(int b)//1 is set, 0 is unset
 {
+	move(LINES-7, 0);
+	clrtobot();//wipe
+	curs_set(b); 
 	if(b)
 	{
-		move(LINES-7, 0);
-		clrtobot();//wipe
-		curs_set(b); 
 		echo(); 
 		refresh();
 	}
 	else
 	{
-		curs_set(b);
 		noecho();
 	}
 }
@@ -302,6 +304,8 @@ void _cp()
 			exit(1);
 		}
 	}
+
+	while(waitpid(-1, NULL, WNOHANG) == 0);
 }
 
 void _mv()
@@ -383,6 +387,8 @@ void _mv()
 			exit(1);
 		}
 	}
+
+	while(waitpid(-1, NULL, WNOHANG) == 0);
 }
 
 void _mkdir(){
@@ -428,5 +434,27 @@ void _rm(){
 	{
 		execvp(arglist[0], arglist);
 		exit(1);
+	}
+}
+
+void _search(){
+	char c;
+	char buf[BUFSIZ];
+	int i;
+	input_set(1);
+	addch('/');
+	strcpy(buf, "./");
+	scanw("%s", buf+2);
+	for(i = 0; i<count; i++){
+		if(!strcmp(ch_fname(data[i].name), buf)) {
+			data[i].check *=-1;
+			cur_row = i%15;
+			break;
+		}
+	}
+	input_set(0);
+	if(i == count){
+	 	printw("cannot found");
+		while((c=getch())!='\n');
 	}
 }
