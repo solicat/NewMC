@@ -26,7 +26,7 @@ struct item{
 
 char pwd[BUFSIZ - 10];
 char buf[BUFSIZ];
-int count;
+int fcount, dcount, count;
 int page;
 int cur_row;
 int cur_page;
@@ -154,6 +154,7 @@ int main(int argc, char* argv[])
 
 			case KEY_F(8):	_rm();
 					load_ls();
+					cur_row = 0; cur_page = 0;
 					print_ls();
 					break;		//file delete
 
@@ -222,8 +223,8 @@ void load_ls()
 	DIR* dir_ptr;
 	struct dirent* direntp;
 	struct stat info;
-
-	count = 0;
+	
+	fcount = dcount = count = 0;
 
 	if((dir_ptr = opendir(pwd)) == NULL)
 		exit(1);
@@ -236,6 +237,8 @@ void load_ls()
 			stat(direntp->d_name, &info);
 			data[count].size = (long)((struct stat)info).st_size;
 			strcpy(data[count].mod_time, ctime(&(info.st_mtime)));
+			if(S_ISDIR(info.st_mode)) dcount++;
+			else fcount++;
 			count++;
 		}
 	}
@@ -253,7 +256,14 @@ void print_ls()
 {
 	move(LINES-3, 0);
 	attron(A_UNDERLINE);
-	printw("%d Files in this directory                          Page (%d / %d)", count - 1, cur_page+1, page+1);
+	if(count-1 == 0)
+		printw("No Directories and Files in this directory                      ");
+	else if(dcount - 2 == 0)
+		printw("%2d Files in this directory                          Page (%d / %d)", fcount, cur_page+1, page+1);
+	else if(fcount == 0)
+		printw("%2d Directories in this directory                    Page (%d / %d)", dcount - 2, cur_page+1, page+1);
+	else
+		printw("%2d Directories and %2d Files in this directory       Page (%d / %d)", dcount - 2, fcount, cur_page+1, page+1);
 	attroff(A_UNDERLINE);
 	move(LS-1, 5);
 	attron(COLOR_PAIR(SELECT));
@@ -656,4 +666,3 @@ void cat_title(int* pos, char* f){
 	printw("[[ %s ]]", f);
 	move(*pos+2, 0);
 }
-
