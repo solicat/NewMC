@@ -525,6 +525,7 @@ void _rm(){
 		execvp(arglist[0], arglist);
 		exit(1);
 	}
+	while(waitpid(-1, NULL, WNOHANG) == 0);
 }
 
 void _search(){
