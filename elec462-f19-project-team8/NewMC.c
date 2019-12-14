@@ -45,6 +45,10 @@ void _mv();
 void _mkdir();
 void _rm();
 void _search();
+void help_mess(WINDOW* win, int* , int, char* m);
+void _help();
+void _cat();
+void cat_title(int*, char*);
 
 int main(int argc, char* argv[])
 {
@@ -109,6 +113,16 @@ int main(int argc, char* argv[])
 					}
 					break;
 
+			case KEY_F(1) : _help();
+					break;
+
+			case KEY_F(2) : _cat();
+					load_ls();
+					break;
+
+			case KEY_F(3) : _search();           //search
+				   	break;
+
 			case KEY_F(5):	_cp();
 					load_ls();
 					print_ls();
@@ -131,9 +145,6 @@ int main(int argc, char* argv[])
 
 			case KEY_F(9):	endwin();
 					return 1;	//quit
-
-			case '/' : _search();           //search
-				   break;
 
 			case KEY_HOME:	cur_row = 0; 
 					break;		//cur move top
@@ -177,6 +188,7 @@ int static compare(const void* first, const void* second)
 
 void load_ls()
 {
+	/*
 	FILE* fp;
 	char command[BUFSIZ] = "ls -al ";
 	strcat(command, pwd);
@@ -192,8 +204,8 @@ void load_ls()
 		count++;
 	}
 	page = count/15;
-	pclose(fp);
-	/*DIR* dir_ptr;
+	pclose(fp);*/
+	DIR* dir_ptr;
 	struct dirent* direntp;
 	struct stat info;
 
@@ -220,7 +232,7 @@ void load_ls()
 
 	for(int i = 0; i < count - 1; i++)
 		data[i] = data[i + 1];
-	count -= 1;*/
+	count -= 1;
 }
 
 void print_ls()
@@ -230,10 +242,10 @@ void print_ls()
 	printw("%d Files in this directory               Page (%d / %d)", count - 1, cur_page+1, page+1);
 	attroff(A_UNDERLINE);
 	move(LS-1, 5);
-	//attron(COLOR_PAIR(SELECT));
-	printw("[[ File List ]]");
-	//printw(".n%29s%31s", "Name", "Size");
-	//attroff(COLOR_PAIR(SELECT));
+	attron(COLOR_PAIR(SELECT));
+	//printw("[[ File List ]]");
+	printw(".n%29s%31s", "Name", "Size");
+	attroff(COLOR_PAIR(SELECT));
 	if(cur_page < page)
 	{
 		for(int i = cur_page*15; i < (cur_page+1)*15; i++)
@@ -246,8 +258,8 @@ void print_ls()
 			}
 			if(data[i].check == -1)
 				attron(COLOR_PAIR(SELECT));
-			printw("%s", data[i].name);			
-			//printw("%-55s%6ld", data[i].name, data[i].size);
+			//printw("%s", data[i].name);			
+			printw("%-55s%6ld", data[i].name, data[i].size);
 			if(data[i].check == -1)
 				attroff(COLOR_PAIR(SELECT));
 		}
@@ -264,8 +276,8 @@ void print_ls()
 			}
 			if(data[i].check == -1)
 				attron(COLOR_PAIR(SELECT));
-			printw("%s", data[i].name);
-			//printw("%-55s%6ld", data[i].name, data[i].size);
+			//printw("%s", data[i].name);
+			printw("%-55s%6ld", data[i].name, data[i].size);
 			if(data[i].check == -1)
 				attroff(COLOR_PAIR(SELECT));
 		}
@@ -277,7 +289,7 @@ void print_ls()
 
 void print_menu()
 {
-	char* menu[10] = {"Help", "Menu", "View", "Edit", "Copy", "Ren/Mov", "Mkdir", "Delete", "Quit"};
+	char* menu[10] = {"Help", "CAT", "SEARCH", "Edit", "Copy", "Ren/Mov", "Mkdir", "Delete", "Quit"};
 	move(LINES-2, 0);
 	for(int i = 0; i < 9; i++)
 	{
@@ -289,12 +301,10 @@ void print_menu()
 
 char* ch_fname(char* f)
 {
-	char fname[30], *name, *filename;
+	char fname[30], *filename;
 	//filename extraction
 	strcpy(fname, "./");
-	name = strrchr(f, ' ')+1;
-	strcat(fname, name);
-	fname[strlen(fname)-1]='\0';//remove \r\n
+	strcpy(fname+2, f);
 
 	filename = (char*)malloc(sizeof(fname));
 	strcpy(filename, fname);
@@ -512,4 +522,88 @@ void _search(){
 	 	printw("cannot found");
 		while((c=getch())!='\n');
 	}
+}
+
+void help_mess(WINDOW* win, int* y, int x, char* m){
+	wmove(win, *y, x); 
+	*y+=2;
+	waddstr(win, m);
+}
+
+void _help(){
+	int width=50, height=20, px=12, py=4, _y = 3, _x = 1;
+	WINDOW* win = newwin(height, width, py, px);
+	box(win, 0, 0);
+	//help title
+	wmove(win, 0, width/2-4);
+	waddstr(win, "< HELP >");
+	//virticle line
+	wmove(win, 1, width/2);
+	wvline(win, 0, height-3);
+
+	help_mess(win, &_y, _x, "F1: Provide help.");
+	help_mess(win, &_y, _x, "F2: Show the contents");
+	help_mess(win, &_y, _x, "F3: Find the file");
+	help_mess(win, &_y, _x, "F4: Select All/");
+	wmove(win, _y-1, _x); waddstr(win, "    Deselect All"); _y++;
+	help_mess(win, &_y, _x, "F5: Copy file.");
+	_y = 3; _x = width/2+1;
+	help_mess(win, &_y, _x, "F6: Rename or change"); 
+	wmove(win, _y-1, _x); waddstr(win, "    directory"); _y++;
+	help_mess(win, &_y, _x, "F7: Make new directory.");
+	help_mess(win, &_y, _x, "F8: Delete file.");
+	help_mess(win, &_y, _x, "F9: Exit  mc"); _y+=2; wmove(win, _y, _x);
+	waddstr(win, "When 'quit' is enterd,"); _y++; wmove(win, _y, _x);
+	waddstr(win, "return to inital scre"); _y++; wmove(win, _y, _x);
+	waddstr(win, "en at any time."); _y=18; wmove(win, _y, _x-8);
+	
+	waddstr(win, "<press any key>");
+
+	init_pair(3, COLOR_BLACK, COLOR_WHITE);
+	wbkgd(win, COLOR_PAIR(3));
+
+	wrefresh(win);
+
+	getch();//wait
+
+}
+
+void _cat(){
+	FILE *fp;
+	char *filelist[MAX], cmd[MAX], buf[BUFSIZ], c;
+	int len = 0, pos;
+	for(int i=0; i<count; i++)
+	{
+		if(data[i].check == -1)
+			filelist[len++] = ch_fname(data[i].name);
+	}
+
+	for(int i=0; i<len; i++)
+	{
+		sprintf(cmd, "%s %s", "cat", filelist[i]);//cmd = cat file
+		fp = popen(cmd, "r");
+
+		cat_title(&pos, filelist[i]);	
+
+		//print cat
+		while(fgets(buf, BUFSIZ, fp))
+		{
+			printw("%s", buf);
+			if(++pos==LINES-5){//next page
+				while((c=getch())!='\n');
+				cat_title(&pos, filelist[i]);
+			}
+		}
+		while((c=getch())!='\n');//wait
+		pclose(fp);
+	}
+
+}
+
+void cat_title(int* pos, char* f){
+	*pos = PWD -1;
+	clear();
+	move(*pos, 5);
+	printw("[[ %s ]]", f);
+	move(*pos+2, 0);
 }
