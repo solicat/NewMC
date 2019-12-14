@@ -121,8 +121,21 @@ int main(int argc, char* argv[])
 					load_ls();
 					break;
 
-			case KEY_F(3) : _search();           //search
-				   	break;
+			case KEY_F(3) : _search();           
+				   	break;		//search
+
+			case KEY_F(4) : if(cur_page*15 + cur_row == 0) continue;
+					if(data[cur_page*15 + cur_row].check == 1)
+					{
+						for(int i = 1; i < count ; i++)
+							data[i].check = -1;
+					}
+					else
+					{
+						for(int i = 1; i < count ; i++)
+							data[i].check = 1;
+					}
+				   	break;		//(dis)select all files
 
 			case KEY_F(5):	_cp();
 					load_ls();
@@ -240,11 +253,11 @@ void print_ls()
 {
 	move(LINES-3, 0);
 	attron(A_UNDERLINE);
-	printw("%d Files in this directory               Page (%d / %d)", count - 1, cur_page+1, page+1);
+	printw("%d Files in this directory                          Page (%d / %d)", count - 1, cur_page+1, page+1);
 	attroff(A_UNDERLINE);
 	move(LS-1, 5);
 	attron(COLOR_PAIR(SELECT));
-	//printw("[[ File List ]]");
+
 	printw(".n%8s%34s%16s", "Name", "Size", "Modify time");
 	attroff(COLOR_PAIR(SELECT));
 	if(cur_page < page)
@@ -294,11 +307,11 @@ void print_ls()
 
 void print_menu()
 {
-	char* menu[10] = {"Help", "CAT", "SEARCH", "Edit", "Copy", "Ren/Mov", "Mkdir", "Delete", "Quit"};
+	char* menu[9] = {"Help", "CAT", "SEARCH", "SelA", "Copy", "Ren/Mov", "Mkdir", "Delete", "Exit"};
 	move(LINES-2, 0);
 	for(int i = 0; i < 9; i++)
 	{
-		printw("F%-2d %-8s", i + 1, menu[i]);
+		printw("F%-2d %-10s", i + 1, menu[i]);
 		if(i==4) move(LINES-1, 0);
 	}
 	move(LINES-1, COLS-1);
@@ -355,7 +368,7 @@ void _cp()
 		if(data[i].check == -1){
 			strcpy(sourcefile[num], ch_fname(data[i].name));
 			input_set(1);
-			printw("('quit' to return)   input filename : cp %s : ", sourcefile[num]);
+			printw("input filename : cp %s : ", sourcefile[num]);
 			scanw("%s", buf);
 			if(strcmp(buf, "quit")==0) return;
 			strcpy(targetfile[num++], buf);
@@ -381,92 +394,100 @@ void _mv()
 {
 	char buf[BUFSIZ];
 	int pid, num=0;
-	int mv_stat = 0;//0 : mv file1 file2     1: mv file1 dir1
+	int mv_c=0;
+	int mv_stat = 0; //0 : mv file1 file2     1: mv file1 dir1
+	char *menu[3] = {"1. Rename", "2. Move Directory", "3. Quit"};
 	signal(SIGCHLD, child_waiter);
-
-	input_set(1);
-	printw("selecet mode : 1. rename  2. move directory  3. return >> ");
-	do
+	while(1)
 	{
-		scanw("%d ", &mv_stat);
-		if(mv_stat == 3) return;
-		if(mv_stat !=1 && mv_stat != 2)
-			printw("please input 1 or 2 or 3 >> ");
-		else break;
-	}
-	while(1);
-
-	if(mv_stat == 1)	//rename files selected
-	{
-		char sourcefile[MAX][BUFSIZ], targetfile[MAX][BUFSIZ];
-
-		//input targetfile names
-		for(int i =0; i<count; i++)
-		{
-			if(data[i].check == -1)
-			{
-				strcpy(sourcefile[num], ch_fname(data[i].name));
-				input_set(1);
-				printw("('quit' to return)   input filename : mv %s : ", sourcefile[num]);
-				scanw("%s", buf);
-				if(strcmp(buf, "quit")==0) return;
-				strcpy(targetfile[num++], buf);
-			}
-		}
-
-		input_set(0);	
-
-		//exec cp source target (num is checking num)
-		for(int i=0; i<num; i++)
-		{
-			if((pid=fork())==-1) return;
-			if(pid ==0)
-			{
-				execlp("mv", "mv", sourcefile[i], targetfile[i], NULL);
-				exit(1);
-			}
-		}
-	}
-	else	//move on another directory
-	{
-		char *arglist[MAX];
-
 		input_set(1);
-		addstr("('quit' to return)   input dirname: ");
-		scanw("%s", buf);
-		if(strcmp(buf, "quit")==0) return;
-
-		arglist[num++] = "mv";
-
-		//mv file1 file2 file3... dir1
-		for(int i=0; i<count; i++)
+		printw("[selecet mode]");
+		for(int i = 0; i < 3 ; i++)
 		{
-			if(data[i].check == -1)
-				arglist[num++] = ch_fname(data[i].name);
+			move(LINES-6+i, 0);
+			if(i == mv_c) printw(">> ");
+			move(LINES-6+i, 5);
+			printw("%s", menu[i]);
 		}
-	
-		arglist[num++] = buf;
-		arglist[num] = 0;
-		input_set(0);
-
-		if((pid=fork())==-1) return;
-		if(pid ==0)
+		move(LINES-1, COLS-1);
+		switch(mv_stat = getch())
 		{
-			execvp(arglist[0], arglist);
-			exit(1);
+			case KEY_DOWN: if(mv_c < 2)mv_c++; break;
+			case KEY_UP: if(mv_c > 0) mv_c--; break;
+			case '\n':
+					if(mv_c == 2) return; // quit
+					else if(mv_c == 0)	//rename files selected
+					{
+						char sourcefile[MAX][BUFSIZ], targetfile[MAX][BUFSIZ];
+
+						//input targetfile names
+						for(int i =0; i<count; i++)
+						{
+							if(data[i].check == -1)
+							{
+								strcpy(sourcefile[num], ch_fname(data[i].name));
+								input_set(1);
+								printw("input filename : mv %s : ", sourcefile[num]);
+								scanw("%s", buf);
+								if(strcmp(buf, "quit")==0) return;
+								strcpy(targetfile[num++], buf);
+							}
+						}
+						input_set(0);	
+
+						//exec cp source target (num is checking num)
+						for(int i=0; i<num; i++)
+						{
+							if((pid=fork())==-1) return;
+							if(pid ==0)
+							{
+								execlp("mv", "mv", sourcefile[i], targetfile[i], NULL);
+								exit(1);
+							}
+						}
+					}
+
+					else	//move on another directory
+					{
+						char *arglist[MAX];
+
+						input_set(1);
+						addstr("input dirname: ");
+						scanw("%s", buf);
+						if(strcmp(buf, "quit")==0) return;
+
+						arglist[num++] = "mv";
+
+						//mv file1 file2 file3... dir1
+						for(int i=0; i<count; i++)
+						{
+							if(data[i].check == -1)
+								arglist[num++] = ch_fname(data[i].name);
+						}
+	
+						arglist[num++] = buf;
+						arglist[num] = 0;
+						input_set(0);
+	
+						if((pid=fork())==-1) return;
+						if(pid ==0)
+						{
+							execvp(arglist[0], arglist);
+							exit(1);
+						}
+					}
+					while(waitpid(-1, NULL, WNOHANG) == 0);
+					return;
 		}
 	}
-
-	while(waitpid(-1, NULL, WNOHANG) == 0);
 }
-
 void _mkdir(){
 	char *arglist[MAX], buf[BUFSIZ];
 	int pid, len=1;
 	signal(SIGCHLD, child_waiter);
 
 	input_set(1);
-	addstr("('quit' to return)   input dirname : ");
+	addstr("input dirname : ");
 
 	arglist[0] = "mkdir";
 	scanw("%s", buf);
@@ -548,7 +569,7 @@ void _help(){
 
 	help_mess(win, &_y, _x, "F1: Provide help.");
 	help_mess(win, &_y, _x, "F2: Show the contents");
-	help_mess(win, &_y, _x, "F3: Find the file");
+	help_mess(win, &_y, _x, "F3: Find and Select");
 	help_mess(win, &_y, _x, "F4: Select All/");
 	wmove(win, _y-1, _x); waddstr(win, "    Deselect All"); _y++;
 	help_mess(win, &_y, _x, "F5: Copy file.");
@@ -612,3 +633,4 @@ void cat_title(int* pos, char* f){
 	printw("[[ %s ]]", f);
 	move(*pos+2, 0);
 }
+
