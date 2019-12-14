@@ -19,6 +19,8 @@
 struct item{
 	int check;
 	char name[BUFSIZ];
+	long size;
+	char* mod_time;
 }item;
 
 char pwd[BUFSIZ - 10];
@@ -62,10 +64,8 @@ int main(int argc, char* argv[])
 	init_pair(SELECT, COLOR_YELLOW, COLOR_BLACK);
 
 	int c; cur_row = 0; cur_page = 0;
-	FILE* fp; struct stat sbuf;
 
-	fp = popen("pwd", "r");
-	fgets(pwd, BUFSIZ, fp);
+	getcwd(pwd, BUFSIZ-10);
 	load_ls();
 
 	while(1)
@@ -85,6 +85,20 @@ int main(int argc, char* argv[])
 					break;
 
 			case KEY_UP: if(cur_row>0)cur_row--; else if(cur_page > 0){cur_row=14; cur_page--;} break;
+
+			case KEY_PPAGE: if(cur_page > 0){
+						cur_page--;
+					}
+					else cur_row = 0;
+					break;
+
+			case KEY_NPAGE: if(cur_page < page){
+						cur_page++;
+						if(cur_row > count%15 - 1)
+							cur_row = count%15 - 1;
+					}
+					else cur_row = count%15 - 1;
+					break;
 
 			case '\n': if(isadir(ch_fname(data[cur_page*15 + cur_row].name))){
 					//if directory. chdir.
@@ -115,8 +129,7 @@ int main(int argc, char* argv[])
 					print_ls();
 					break;		//file delete
 
-			case KEY_F(9):	pclose(fp);
-					endwin();
+			case KEY_F(9):	endwin();
 					return 1;	//quit
 
 			case '/' : _search();           //search
@@ -125,18 +138,22 @@ int main(int argc, char* argv[])
 			case KEY_HOME:	cur_row = 0; 
 					break;		//cur move top
 
-			case KEY_END:	cur_row = count%15 - 1;
+			case KEY_END:	if(cur_page == page) cur_row = count%15 - 1;
+					else cur_row = 14;
 					break;		//cur move bottom
 			case KEY_IC:	if(cur_page*15 + cur_row != 0)
 						data[cur_page*15 + cur_row].check *= -1;
 					if((cur_page < page && cur_row+1<15) || (cur_page == page && cur_page*15 + cur_row +1<count))
 						cur_row++;
+					else if(cur_page < page && cur_row == 14)
+					{
+						cur_page++;
+						cur_row = 0;
+					}
 					break;
 			default: break;
 		}
 	}
-
-	pclose(fp);
 	endwin();
 }
 
@@ -151,6 +168,11 @@ void print_pwd()
 	standend();
 	move(LINES-1, 0);
 	refresh();	
+}
+
+int static compare(const void* first, const void* second)
+{
+	return strcmp((char*)((struct item*)first)->name, (char*)((struct item*)second)->name);
 }
 
 void load_ls()
@@ -171,6 +193,34 @@ void load_ls()
 	}
 	page = count/15;
 	pclose(fp);
+	/*DIR* dir_ptr;
+	struct dirent* direntp;
+	struct stat info;
+
+	count = 0;
+
+	if((dir_ptr = opendir(pwd)) == NULL)
+		exit(1);
+	else
+	{
+		while((direntp = readdir(dir_ptr)) != NULL)
+		{
+			data[count].check = 1;
+			strcpy(data[count].name, direntp->d_name);
+			stat(direntp->d_name, &info);
+			data[count].size = (long)((struct stat)info).st_size;
+//			strcpy(data[count].mod_time, 4+ctime((struct stat)info).st_mtime);
+			count++;
+		}
+		page = count/15;
+	}
+	closedir(dir_ptr);
+
+	qsort(data, count, sizeof(item), compare);
+
+	for(int i = 0; i < count - 1; i++)
+		data[i] = data[i + 1];
+	count -= 1;*/
 }
 
 void print_ls()
@@ -180,8 +230,10 @@ void print_ls()
 	printw("%d Files in this directory               Page (%d / %d)", count - 1, cur_page+1, page+1);
 	attroff(A_UNDERLINE);
 	move(LS-1, 5);
+	//attron(COLOR_PAIR(SELECT));
 	printw("[[ File List ]]");
-
+	//printw(".n%29s%31s", "Name", "Size");
+	//attroff(COLOR_PAIR(SELECT));
 	if(cur_page < page)
 	{
 		for(int i = cur_page*15; i < (cur_page+1)*15; i++)
@@ -194,7 +246,8 @@ void print_ls()
 			}
 			if(data[i].check == -1)
 				attron(COLOR_PAIR(SELECT));
-			printw("%s", data[i].name);
+			printw("%s", data[i].name);			
+			//printw("%-55s%6ld", data[i].name, data[i].size);
 			if(data[i].check == -1)
 				attroff(COLOR_PAIR(SELECT));
 		}
@@ -212,6 +265,7 @@ void print_ls()
 			if(data[i].check == -1)
 				attron(COLOR_PAIR(SELECT));
 			printw("%s", data[i].name);
+			//printw("%-55s%6ld", data[i].name, data[i].size);
 			if(data[i].check == -1)
 				attroff(COLOR_PAIR(SELECT));
 		}
@@ -445,6 +499,7 @@ void _search(){
 	addch('/');
 	strcpy(buf, "./");
 	scanw("%s", buf+2);
+	if(strcmp(buf, "./..") == 0) return;
 	for(i = 0; i<count; i++){
 		if(!strcmp(ch_fname(data[i].name), buf)) {
 			data[i].check *=-1;
