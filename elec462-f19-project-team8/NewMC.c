@@ -9,6 +9,7 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <curses.h>
+#include <time.h>
 
 #define MAX 100 //number of check
 #define PWD 2
@@ -20,7 +21,7 @@ struct item{
 	int check;
 	char name[BUFSIZ];
 	long size;
-	char* mod_time;
+	char mod_time[26];
 }item;
 
 char pwd[BUFSIZ - 10];
@@ -221,10 +222,9 @@ void load_ls()
 			strcpy(data[count].name, direntp->d_name);
 			stat(direntp->d_name, &info);
 			data[count].size = (long)((struct stat)info).st_size;
-//			strcpy(data[count].mod_time, 4+ctime((struct stat)info).st_mtime);
+			strcpy(data[count].mod_time, ctime(&(info.st_mtime)));
 			count++;
 		}
-		page = count/15;
 	}
 	closedir(dir_ptr);
 
@@ -233,6 +233,7 @@ void load_ls()
 	for(int i = 0; i < count - 1; i++)
 		data[i] = data[i + 1];
 	count -= 1;
+	page = count/15;
 }
 
 void print_ls()
@@ -244,7 +245,7 @@ void print_ls()
 	move(LS-1, 5);
 	attron(COLOR_PAIR(SELECT));
 	//printw("[[ File List ]]");
-	printw(".n%29s%31s", "Name", "Size");
+	printw(".n%8s%34s%16s", "Name", "Size", "Modify time");
 	attroff(COLOR_PAIR(SELECT));
 	if(cur_page < page)
 	{
@@ -258,8 +259,10 @@ void print_ls()
 			}
 			if(data[i].check == -1)
 				attron(COLOR_PAIR(SELECT));
-			//printw("%s", data[i].name);			
-			printw("%-55s%6ld", data[i].name, data[i].size);
+			//printw("%s", data[i].name);
+			if(isadir(data[i].name)) printw("/");
+			else printw(" ");		
+			printw("%-35s%8ld%30s", data[i].name, data[i].size, data[i].mod_time);
 			if(data[i].check == -1)
 				attroff(COLOR_PAIR(SELECT));
 		}
@@ -277,7 +280,9 @@ void print_ls()
 			if(data[i].check == -1)
 				attron(COLOR_PAIR(SELECT));
 			//printw("%s", data[i].name);
-			printw("%-55s%6ld", data[i].name, data[i].size);
+			if(isadir(data[i].name)) printw("/");
+			else printw(" ");
+			printw("%-35s%8ld%30s", data[i].name, data[i].size, data[i].mod_time);
 			if(data[i].check == -1)
 				attroff(COLOR_PAIR(SELECT));
 		}
