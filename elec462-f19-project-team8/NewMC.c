@@ -361,6 +361,7 @@ void _cp()
 {
 	char sourcefile[MAX][BUFSIZ], targetfile[MAX][BUFSIZ], buf[BUFSIZ];
 	int pid, num=0;
+	int i;
 	signal(SIGCHLD, child_waiter);
 
 	//input targetfile names
@@ -368,25 +369,34 @@ void _cp()
 		if(data[i].check == -1){
 			strcpy(sourcefile[num], ch_fname(data[i].name));
 			input_set(1);
-			printw("input filename : cp %s : ", sourcefile[num]);
+			if(isadir(ch_fname(data[i].name)))
+				printw("input dirname > cp -r %s : ", sourcefile[num]+2);	
+			else
+				printw("input filename > cp %s : ", sourcefile[num]+2);
 			scanw("%s", buf);
 			if(strcmp(buf, "quit")==0) return;
 			strcpy(targetfile[num++], buf);
 		}
 	}
-	input_set(0);
-
+	
 	//exec cp source target (num is checking num)
-	for(int i=0; i<num; i++)
+	for(i=0; i<num; i++)
 	{
 		if((pid=fork())==-1) return;
 		if(pid ==0)
 		{
-			execlp("cp", "cp", sourcefile[i], targetfile[i], NULL);
-			exit(1);
+			if(isadir(ch_fname(sourcefile[i]))){
+				execlp("cp", "cp", "-r", sourcefile[i], targetfile[i], NULL);
+				exit(1);
+			}
+			else{
+				execlp("cp", "cp", sourcefile[i], targetfile[i], NULL);
+				exit(1);
+			}
 		}
 	}
 
+	input_set(0);
 	while(waitpid(-1, NULL, WNOHANG) == 0);
 }
 
@@ -427,7 +437,7 @@ void _mv()
 							{
 								strcpy(sourcefile[num], ch_fname(data[i].name));
 								input_set(1);
-								printw("input filename : mv %s : ", sourcefile[num]);
+								printw("input filename > mv %s : ", sourcefile[num]+2);
 								scanw("%s", buf);
 								if(strcmp(buf, "quit")==0) return;
 								strcpy(targetfile[num++], buf);
@@ -444,7 +454,6 @@ void _mv()
 								execlp("mv", "mv", sourcefile[i], targetfile[i], NULL);
 								exit(1);
 							}
-							while(waitpid(-1, NULL, WNOHANG) == 0);
 						}
 					}
 
@@ -453,7 +462,7 @@ void _mv()
 						char *arglist[MAX];
 
 						input_set(1);
-						addstr("input dirname: ");
+						addstr("input dirname > ");
 						scanw("%s", buf);
 						if(strcmp(buf, "quit")==0) return;
 
@@ -485,10 +494,9 @@ void _mv()
 void _mkdir(){
 	char *arglist[MAX], buf[BUFSIZ];
 	int pid, len=1;
-	signal(SIGCHLD, child_waiter);
 
 	input_set(1);
-	addstr("input dirname : ");
+	addstr("input dirname > ");
 
 	arglist[0] = "mkdir";
 	scanw("%s", buf);
@@ -503,30 +511,42 @@ void _mkdir(){
 		execvp(arglist[0], arglist);
 		exit(1);
 	}
-	while(waitpid(-1, NULL, WNOHANG) == 0);
+	wait(NULL);
 }
 
 void _rm(){
-	char *arglist[MAX];
-	arglist[0] = "rm";
-	int pid, len=1;
+	char *arglist_file[MAX], *arglist_dir[MAX];
+	arglist_file[0] = "rm";
+	arglist_dir[0] = "rm";
+	arglist_dir[1] = "-r";
+	int pid,pid2, flen=1, dlen = 2;
 	signal(SIGCHLD, child_waiter);
 
-	//rm file1 file2 file3...
 	for(int i=0; i<count; i++)
 	{
-		if(data[i].check == -1)
-			arglist[len++] = ch_fname(data[i].name);
+		if(data[i].check == -1){
+			if(isadir(ch_fname(data[i].name)))
+				arglist_dir[dlen++] = ch_fname(data[i].name);
+			else
+				arglist_file[flen++] = ch_fname(data[i].name);
+		}	
 	}
-
-	arglist[len] = 0;
+	//rm file1 file2 file3... or rm -r dir1 dir2 dir3...
+	arglist_file[flen] = 0;
+	arglist_dir[dlen] = 0;
 
 	if((pid=fork())==-1) return;
-	if(pid ==0)
+	if(pid == 0)
 	{
-		execvp(arglist[0], arglist);
+		if((pid2=fork())==-1) return;
+		if(pid2 == 0){
+			execvp(arglist_dir[0], arglist_dir);
+			exit(1);
+		}
+		execvp(arglist_file[0], arglist_file);
 		exit(1);
 	}
+
 	while(waitpid(-1, NULL, WNOHANG) == 0);
 }
 
