@@ -99,7 +99,7 @@ int main(int argc, char* argv[])
 
 			case KEY_NPAGE: if(cur_page < page){
 						cur_page++;
-						if(cur_row > count%15 - 1)
+						if(cur_page == page)
 							cur_row = count%15 - 1;
 					}
 					else cur_row = count%15 - 1;
@@ -444,6 +444,7 @@ void _mv()
 								execlp("mv", "mv", sourcefile[i], targetfile[i], NULL);
 								exit(1);
 							}
+							while(waitpid(-1, NULL, WNOHANG) == 0);
 						}
 					}
 
@@ -502,6 +503,7 @@ void _mkdir(){
 		execvp(arglist[0], arglist);
 		exit(1);
 	}
+	while(waitpid(-1, NULL, WNOHANG) == 0);
 }
 
 void _rm(){
