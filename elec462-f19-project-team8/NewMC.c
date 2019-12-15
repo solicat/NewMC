@@ -524,6 +524,7 @@ void _search(){
 	for(i = 0; i<count; i++){
 		if(!strcmp(ch_fname(data[i].name), buf)) {
 			data[i].check *=-1;
+			cur_page = i/15;
 			cur_row = i%15;
 			break;
 		}
