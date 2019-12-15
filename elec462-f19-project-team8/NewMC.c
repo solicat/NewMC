@@ -11,7 +11,7 @@
 #include <curses.h>
 #include <time.h>
 
-#define MAX 100 //number of check
+#define MAX 100 // number of check
 #define PWD 2
 #define LS 4
 
@@ -135,7 +135,7 @@ int main(int argc, char* argv[])
 						for(int i = 1; i < count ; i++)
 							data[i].check = 1;
 					}
-				   	break;		//(dis)select all files
+				   	break;		//(de)select all files
 
 			case KEY_F(5):	_cp();
 					load_ls();
@@ -183,6 +183,7 @@ int main(int argc, char* argv[])
 	endwin();
 }
 
+// Print pwd on window
 void print_pwd()
 {	
 	clear();
@@ -196,30 +197,15 @@ void print_pwd()
 	refresh();	
 }
 
+// Compare function for qsort
 int static compare(const void* first, const void* second)
 {
 	return strcmp((char*)((struct item*)first)->name, (char*)((struct item*)second)->name);
 }
 
+// Read info from DIR*, load to data[] and sort by name
 void load_ls()
 {
-	/*
-	FILE* fp;
-	char command[BUFSIZ] = "ls -al ";
-	strcat(command, pwd);
-
-	count = 0;
-	fp = popen(command, "r");
-	fgets(buf, BUFSIZ, fp);	// info
-	fgets(buf, BUFSIZ, fp);	// ./
-	while(fgets(buf, BUFSIZ, fp))
-	{
-		data[count].check = 1;
-		strcpy(data[count].name, buf);
-		count++;
-	}
-	page = count/15;
-	pclose(fp);*/
 	DIR* dir_ptr;
 	struct dirent* direntp;
 	struct stat info;
@@ -252,6 +238,7 @@ void load_ls()
 	page = count/15;
 }
 
+// Print data[] on window
 void print_ls()
 {
 	move(LINES-3, 0);
@@ -270,7 +257,7 @@ void print_ls()
 
 	printw(".n%8s%34s%16s", "Name", "Size", "Modify time");
 	attroff(COLOR_PAIR(SELECT));
-	if(cur_page < page)
+	if(cur_page < page) // Not the last page
 	{
 		for(int i = cur_page*15; i < (cur_page+1)*15; i++)
 		{
@@ -282,7 +269,6 @@ void print_ls()
 			}
 			if(data[i].check == -1)
 				attron(COLOR_PAIR(SELECT));
-			//printw("%s", data[i].name);
 			if(isadir(data[i].name)) printw("/");
 			else printw(" ");		
 			printw("%-35s%8ld%30s", data[i].name, data[i].size, data[i].mod_time);
@@ -290,7 +276,7 @@ void print_ls()
 				attroff(COLOR_PAIR(SELECT));
 		}
 	}
-	else
+	else	// last page
 	{
 		for(int i = page*15; i < count; i++)
 		{
@@ -302,7 +288,6 @@ void print_ls()
 			}
 			if(data[i].check == -1)
 				attron(COLOR_PAIR(SELECT));
-			//printw("%s", data[i].name);
 			if(isadir(data[i].name)) printw("/");
 			else printw(" ");
 			printw("%-35s%8ld%30s", data[i].name, data[i].size, data[i].mod_time);
@@ -315,6 +300,7 @@ void print_ls()
 	refresh();
 }
 
+// Print menu at the bottom of the window
 void print_menu()
 {
 	char* menu[9] = {"Help", "CAT", "SEARCH", "SelA", "Copy", "Ren/Mov", "Mkdir", "Delete", "Exit"};
@@ -327,6 +313,7 @@ void print_menu()
 	move(LINES-1, COLS-1);
 }
 
+// Return './filename' for other function
 char* ch_fname(char* f)
 {
 	char fname[30], *filename;
@@ -346,6 +333,7 @@ int isadir(char* f)
 	return (stat(f,&info)!=-1 && S_ISDIR(info.st_mode));
 }
 
+// Echo on/off and move curser
 void input_set(int b)//1 is set, 0 is unset
 {
 	move(LINES-7, 0);
@@ -367,6 +355,8 @@ void child_waiter(int signum)
 	while(waitpid(-1, NULL, WNOHANG)>0);
 }
 
+
+// cp command
 void _cp()
 {
 	char sourcefile[MAX][BUFSIZ], targetfile[MAX][BUFSIZ], buf[BUFSIZ];
@@ -410,6 +400,7 @@ void _cp()
 	while(waitpid(-1, NULL, WNOHANG) == 0);
 }
 
+// mv command
 void _mv()
 {
 	char buf[BUFSIZ];
@@ -501,6 +492,8 @@ void _mv()
 		}
 	}
 }
+
+// mkdir command
 void _mkdir(){
 	char *arglist[MAX], buf[BUFSIZ];
 	int pid, len=1;
@@ -524,6 +517,7 @@ void _mkdir(){
 	wait(NULL);
 }
 
+// rm command
 void _rm(){
 	char *arglist_file[MAX], *arglist_dir[MAX];
 	arglist_file[0] = "rm";
@@ -560,6 +554,7 @@ void _rm(){
 	while(waitpid(-1, NULL, WNOHANG) == 0);
 }
 
+// find command
 void _search(){
 	char c;
 	char buf[BUFSIZ];
@@ -589,6 +584,7 @@ void help_mess(WINDOW* win, int* y, int x, char* m){
 	waddstr(win, m);
 }
 
+// print help window on window
 void _help(){
 	int width=50, height=20, px=12, py=4, _y = 3, _x = 1;
 	WINDOW* win = newwin(height, width, py, px);
@@ -627,6 +623,7 @@ void _help(){
 
 }
 
+// cat command
 void _cat(){
 	FILE *fp;
 	char *filelist[MAX], cmd[MAX], buf[BUFSIZ], c;
@@ -659,6 +656,7 @@ void _cat(){
 
 }
 
+// print filename on window
 void cat_title(int* pos, char* f){
 	*pos = PWD -1;
 	clear();
